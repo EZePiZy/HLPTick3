@@ -56,7 +56,7 @@ let adjustPosForRotation
          : XYPos =
     let posOffset =
         match rotation with
-        | Degree90 | Degree270 -> { X = (float)w/2.0 - (float) h/2.0 ;Y = (float) h/2.0 - (float)w/2.0 }
+        | Degree90 | Degree270  -> { X = (float)w/2.0 - (float) h/2.0 ;Y = (float) h/2.0 - (float)w/2.0 }
         | _ ->  failwithf "Can't encounter Degree0 or Degree180 here in SymbolResizeHelpers/adjustPosForRotation function"
     pos - posOffset
 
@@ -75,6 +75,7 @@ let rotateSymbol (rotation: Rotation) (sym: Symbol) : Symbol =
         
     | _ ->
         let h,w = getRotatedHAndW sym
+        // printfn $"[DEBUG] SymbolResizeHelpers/rotateSymbol: rotation: {rotation}"
 
         let newPos = adjustPosForRotation rotation h w sym.Pos
         let newComponent = { sym.Component with X = newPos.X; Y = newPos.Y}

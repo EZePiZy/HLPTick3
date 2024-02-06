@@ -1,7 +1,55 @@
-﻿module TestDrawBlock
+﻿// Q. 6
+//  A
+// The sample data is defined in the horizLinePositions variable within the Tests module.
+// This data is based on 11 equidistant points on a horizontal line, generated from a list
+// of integers from -100 to 100 with steps of 20. These integers are then mapped to a structure
+// ({ X = float n; Y = 0. }) where each point's X-coordinate is set to the integer value and the
+// Y-coordinate is fixed at 0., effectively placing them on a horizontal line. The middleOfSheet
+// is added to the X-coordinate, positioning these points relative to a central reference point on
+// the Issie design sheet.
+
+//  B
+// The conversion of this sample data into an Issie design sheet is performed by the makeTest1Circuit function.
+// This function takes an XYPos as the position for placing an symbols on the sheet. It then Initialises a new sheet model and
+// places the symbols on the sheet using the placeSymbol function. The symbols and wires are placed at the specified positions and the
+// resulting sheet is returned.
+
+// C
+// test1 and test2 use failOnSampleNumber to force a failure on specific
+// samples (0 and 10, respectively). Test3 uses failOnSymbolIntersectsSymbol to test for symbols overlapping.
+// test4 uses failOnAllTests to sequentially display all the sheets generated.
+
+// Q. 7
+// See code below for test 5
+
+// Q. 8
+// Function calls:
+// MenuAction (MenuDrawBlockTest) ((testIndex, dispatch_1, model)) => {}
+// UpdateModel (a_1 => new Model (a_1.UserData, a_1.WaveSim, a_1.WaveSimSh))
+// UpdateDrawBlockTestState (_arg => {const matchValue = result.Test})
+
+// - MenuAction Dispatch: The selection of the menu item dispatches a MenuAction with parameters indicating the
+//                        specific test to run (e.g., MenuDrawBlockTest (testIndex, dispatch, model)). This action
+//                        encapsulates the intention to start "Test 1" without immediately calling the test function.
+//
+// - UpdateModel: The MenuAction handling logic might lead to an UpdateModel call, which updates the
+//                application's model/state to reflect that a test is about to be executed.
+//
+// - UpdateDrawBlockTestState: Before executing the test, there might be a state update specific to the draw block testing environment
+
+// Forward References: By passing function values (e.g., the actual test functions) through data structures or as
+// parameters, it is possible to avoid direct forward references to functions defined later in the source order.
+
+// Q. 9
+// Ok, the  code in TestDrawBlock.fs and GenerateData.fs is understood.
+
+// Q. 10
+// See test6 for code. Had to play around with existing functions (flipSymbol & rotateSymbol) to get it to work.
+
+module TestDrawBlock
+
 open GenerateData
 open Elmish
-
 
 //-------------------------------------------------------------------------------------------//
 //--------Types to represent tests with (possibly) random data, and results from tests-------//
@@ -9,67 +57,59 @@ open Elmish
 module TestLib =
 
     /// convenience unsafe function to extract Ok part of Result or fail if value is Error
-    let getOkOrFail (res: Result<'a,string>) =
+    let getOkOrFail (res: Result<'a, string>) =
         match res with
         | Ok x -> x
-        | Error mess ->
-            failwithf "%s" mess
-
+        | Error mess -> failwithf "%s" mess
 
     type TestStatus =
-            | Fail of string
-            | Exception of string
+        | Fail of string
+        | Exception of string
 
-    type Test<'a> = {
-        Name: string
-        Samples: Gen<'a>
-        StartFrom: int
-        /// The 1st argument is the test number: allows assertions that fail on a specific sample
-        /// to display just one sample.
-        /// The return value is None if test passes, or Some message if it fails.
-        Assertion: int -> 'a -> string option
+    type Test<'a> =
+        {
+            Name: string
+            Samples: Gen<'a>
+            StartFrom: int
+            /// The 1st argument is the test number: allows assertions that fail on a specific sample
+            /// to display just one sample.
+            /// The return value is None if test passes, or Some message if it fails.
+            Assertion: int -> 'a -> string option
         }
 
-    type TestResult<'a> = {
-        TestName: string
-        TestData: Gen<'a>
-        FirstSampleTested: int
-        TestErrors: (int * TestStatus) list
-    }
+    type TestResult<'a> =
+        { TestName: string
+          TestData: Gen<'a>
+          FirstSampleTested: int
+          TestErrors: (int * TestStatus) list }
 
     let catchException name func arg =
         try
-            Ok (func arg)
-        with
-            | e ->
-                Error ($"Exception when running {name}\n" + e.StackTrace)
-            
+            Ok(func arg)
+        with e ->
+            Error($"Exception when running {name}\n" + e.StackTrace)
+
     /// Run the Test samples from 0 up to test.Size - 1.
     /// The return list contains all failures or exceptions: empty list => everything has passed.
     /// This will always run to completion: use truncate if text.Samples.Size is too large.
-    let runTests (test: Test<'a>) : TestResult<'a>  =
-        [test.StartFrom..test.Samples.Size - 1]
+    let runTests (test: Test<'a>) : TestResult<'a> =
+        [ test.StartFrom .. test.Samples.Size - 1 ]
         |> List.map (fun n ->
-                catchException $"generating test {n} from {test.Name}" test.Samples.Data n
-                |> (fun res -> n,res)
-           )           
+            catchException $"generating test {n} from {test.Name}" test.Samples.Data n
+            |> (fun res -> n, res))
         |> List.collect (function
-                            | n, Error mess -> [n, Exception mess]
-                            | n, Ok sample ->
-                                match catchException $"'test.Assertion' on test {n} from 'runTests'" (test.Assertion n) sample with
-                                | Ok None -> []
-                                | Ok (Some failure) -> [n,Fail failure]
-                                | Error (mess) -> [n,Exception mess])
-        |> (fun resL ->                
-                {
-                    TestName = test.Name
-                    FirstSampleTested = test.StartFrom
-                    TestData = test.Samples
-                    TestErrors =  resL
-                })
- 
- 
-            
+            | n, Error mess -> [ n, Exception mess ]
+            | n, Ok sample ->
+                match catchException $"'test.Assertion' on test {n} from 'runTests'" (test.Assertion n) sample with
+                | Ok None -> []
+                | Ok(Some failure) -> [ n, Fail failure ]
+                | Error(mess) -> [ n, Exception mess ])
+        |> (fun resL ->
+            { TestName = test.Name
+              FirstSampleTested = test.StartFrom
+              TestData = test.Samples
+              TestErrors = resL })
+
 (******************************************************************************************
    This submodule contains a set of functions that enable random data generation
    for property-based testing of Draw Block wire routing functions.
@@ -91,8 +131,9 @@ module HLPTick3 =
     open Sheet.SheetInterface
     open GenerateData
     open TestLib
+    open SymbolResizeHelpers
 
-    /// create an initial empty Sheet Model 
+    /// create an initial empty Sheet Model
     let initSheetModel = DiagramMainView.init().Sheet
 
     /// Optic to access SheetT.Model from Issie Model
@@ -106,12 +147,11 @@ module HLPTick3 =
 
     /// allowed max X or y coord of svg canvas
     let maxSheetCoord = Sheet.Constants.defaultCanvasSize
-    let middleOfSheet = {X=maxSheetCoord/2.;Y=maxSheetCoord/2.}
+    let middleOfSheet = { X = maxSheetCoord / 2.; Y = maxSheetCoord / 2. }
 
     /// Used throughout to compare labels since these are case invariant "g1" = "G1"
     let caseInvariantEqual str1 str2 =
         String.toUpper str1 = String.toUpper str2
- 
 
     /// Identify a port from its component label and number.
     /// Usually both an input and output port will mathc this, so
@@ -121,64 +161,59 @@ module HLPTick3 =
     type SymbolPort = { Label: string; PortNumber: int }
 
     /// convenience function to make SymbolPorts
-    let portOf (label:string) (number: int) =
-        {Label=label; PortNumber = number}
-
+    let portOf (label: string) (number: int) = { Label = label; PortNumber = number }
 
     //-----------------------------------------------------------------------------------------------
     // visibleSegments is included here as ahelper for info, and because it is needed in project work
     //-----------------------------------------------------------------------------------------------
 
     /// The visible segments of a wire, as a list of vectors, from source end to target end.
-    /// Note that in a wire with n segments a zero length (invisible) segment at any index [1..n-2] is allowed 
+    /// Note that in a wire with n segments a zero length (invisible) segment at any index [1..n-2] is allowed
     /// which if present causes the two segments on either side of it to coalesce into a single visible segment.
     /// A wire can have any number of visible segments - even 1.
-    let visibleSegments (wId: ConnectionId) (model: SheetT.Model): XYPos list =
+    let visibleSegments (wId: ConnectionId) (model: SheetT.Model) : XYPos list =
 
         let wire = model.Wire.Wires[wId] // get wire from model
 
         /// helper to match even and off integers in patterns (active pattern)
-        let (|IsEven|IsOdd|) (n: int) = match n % 2 with | 0 -> IsEven | _ -> IsOdd
+        let (|IsEven|IsOdd|) (n: int) =
+            match n % 2 with
+            | 0 -> IsEven
+            | _ -> IsOdd
 
         /// Convert seg into its XY Vector (from start to end of segment).
         /// index must be the index of seg in its containing wire.
-        let getSegmentVector (index:int) (seg: BusWireT.Segment) =
-            // The implicit horizontal or vertical direction  of a segment is determined by 
+        let getSegmentVector (index: int) (seg: BusWireT.Segment) =
+            // The implicit horizontal or vertical direction  of a segment is determined by
             // its index in the list of wire segments and the wire initial direction
             match index, wire.InitialOrientation with
-            | IsEven, BusWireT.Vertical | IsOdd, BusWireT.Horizontal -> {X=0.; Y=seg.Length}
-            | IsEven, BusWireT.Horizontal | IsOdd, BusWireT.Vertical -> {X=seg.Length; Y=0.}
+            | IsEven, BusWireT.Vertical
+            | IsOdd, BusWireT.Horizontal -> { X = 0.; Y = seg.Length }
+            | IsEven, BusWireT.Horizontal
+            | IsOdd, BusWireT.Vertical -> { X = seg.Length; Y = 0. }
 
         /// Return a list of segment vectors with 3 vectors coalesced into one visible equivalent
         /// if this is possible, otherwise return segVecs unchanged.
         /// Index must be in range 1..segVecs
-        let tryCoalesceAboutIndex (segVecs: XYPos list) (index: int)  =
-            if segVecs[index] =~ XYPos.zero
-            then
-                segVecs[0..index-2] @
-                [segVecs[index-1] + segVecs[index+1]] @
-                segVecs[index+2..segVecs.Length - 1]
+        let tryCoalesceAboutIndex (segVecs: XYPos list) (index: int) =
+            if segVecs[index] =~ XYPos.zero then
+                segVecs[0 .. index - 2]
+                @ [ segVecs[index - 1] + segVecs[index + 1] ]
+                @ segVecs[index + 2 .. segVecs.Length - 1]
             else
                 segVecs
 
         wire.Segments
         |> List.mapi getSegmentVector
         |> (fun segVecs ->
-                (segVecs,[1..segVecs.Length-2])
-                ||> List.fold tryCoalesceAboutIndex)
+            (segVecs, [ 1 .. segVecs.Length - 2 ])
+            ||> List.fold tryCoalesceAboutIndex)
 
+    //------------------------------------------------------------------------------------------------------------------------//
+    //------------------------------functions to build issue schematics programmatically--------------------------------------//
+    //------------------------------------------------------------------------------------------------------------------------//
 
-//------------------------------------------------------------------------------------------------------------------------//
-//------------------------------functions to build issue schematics programmatically--------------------------------------//
-//------------------------------------------------------------------------------------------------------------------------//
     module Builder =
-
-
-                
-
-            
-
-
 
         /// Place a new symbol with label symLabel onto the Sheet with given position.
         /// Return error if symLabel is not unique on sheet, or if position is outside allowed sheet coordinates (0 - maxSheetCoord).
@@ -187,53 +222,97 @@ module HLPTick3 =
         /// compType - the type of the component
         /// position - the top-left corner of the symbol outline.
         /// model - the Sheet model into which the new symbol is added.
-        let placeSymbol (symLabel: string) (compType: ComponentType) (position: XYPos) (model: SheetT.Model) : Result<SheetT.Model, string> =
+        let placeSymbol
+            (symLabel: string)
+            (compType: ComponentType)
+            (position: XYPos)
+            (model: SheetT.Model)
+            : Result<SheetT.Model, string>
+            =
             let symLabel = String.toUpper symLabel // make label into its standard casing
-            let symModel, symId = SymbolUpdate.addSymbol [] (model.Wire.Symbol) position compType symLabel
+            let symModel, symId =
+                SymbolUpdate.addSymbol [] (model.Wire.Symbol) position compType symLabel
             let sym = symModel.Symbols[symId]
             match position + sym.getScaledDiagonal with
-            | {X=x;Y=y} when x > maxSheetCoord || y > maxSheetCoord ->
-                Error $"symbol '{symLabel}' position {position + sym.getScaledDiagonal} lies outside allowed coordinates"
+            | { X = x; Y = y } when x > maxSheetCoord || y > maxSheetCoord ->
+                Error
+                    $"symbol '{symLabel}' position {position + sym.getScaledDiagonal} lies outside allowed coordinates"
             | _ ->
                 model
                 |> Optic.set symbolModel_ symModel
                 |> SheetUpdate.updateBoundingBoxes // could optimise this by only updating symId bounding boxes
                 |> Ok
-        
 
+        let placeAndOrientSymbol
+            (symLabel: string)
+            (compType: ComponentType)
+            (position: XYPos)
+            (rotation: Rotation)
+            (flip: SymbolT.FlipType)
+            (model: SheetT.Model)
+            : Result<SheetT.Model, string>
+            =
+            let symLabelUpper = String.toUpper symLabel
+            match SymbolUpdate.addSymbol [] (model.Wire.Symbol) position compType symLabelUpper with
+            | symModel, symId ->
+                let sym = symModel.Symbols[symId]
+                let pos =
+                    { X = sym.Component.X + sym.Component.W / 2.0
+                      Y = sym.Component.Y + sym.Component.H / 2.0 }
+                match position + sym.getScaledDiagonal with
+                | { X = x; Y = y } when x > maxSheetCoord || y > maxSheetCoord ->
+                    Error
+                        $"symbol '{symLabelUpper}' position {position + sym.getScaledDiagonal} lies outside allowed coordinates"
+                | _ ->
+                    // printfn "[DEBUG]TestDrawBlocks/placeAndOrientSymbol -- TESTING ROTATION"
+                    // printfn $"[DEBUG]TestDrawBlocks/placeAndOrientSymbol -- Rotation: {rotation}"
+                    let rotatedSym = RotateScale.rotateSymbolByDegree rotation sym
+                    let orientedSym = RotateScale.flipSymbolInBlock flip pos rotatedSym
+                    let updatedSymModel =
+                        { symModel with Symbols = Map.add symId orientedSym symModel.Symbols }
+                    let updatedModel =
+                        model
+                        |> Optic.set symbolModel_ updatedSymModel
+                        |> SheetUpdate.updateBoundingBoxes
+                    Ok updatedModel
+            | _, _ -> Error "Failed to add symbol to model"
 
-    
         /// Place a new symbol onto the Sheet with given position and scaling (use default scale if this is not specified).
         /// The ports on the new symbol will be determined by the input and output components on some existing sheet in project.
         /// Return error if symLabel is not unique on sheet, or ccSheetName is not the name of some other sheet in project.
         let placeCustomSymbol
-                (symLabel: string)
-                (ccSheetName: string)
-                (project: Project)
-                (scale: XYPos)
-                (position: XYPos)
-                (model: SheetT.Model)
-                    : Result<SheetT.Model, string> =
-           let symbolMap = model.Wire.Symbol.Symbols
-           if caseInvariantEqual ccSheetName project.OpenFileName then
-                Error "Can't create custom component with name same as current opened sheet"        
-            elif not <| List.exists (fun (ldc: LoadedComponent) -> caseInvariantEqual ldc.Name ccSheetName) project.LoadedComponents then
+            (symLabel: string)
+            (ccSheetName: string)
+            (project: Project)
+            (scale: XYPos)
+            (position: XYPos)
+            (model: SheetT.Model)
+            : Result<SheetT.Model, string>
+            =
+            let symbolMap = model.Wire.Symbol.Symbols
+            if caseInvariantEqual ccSheetName project.OpenFileName then
+                Error "Can't create custom component with name same as current opened sheet"
+            elif
+                not
+                <| List.exists
+                    (fun (ldc: LoadedComponent) -> caseInvariantEqual ldc.Name ccSheetName)
+                    project.LoadedComponents
+            then
                 Error "Can't create custom component unless a sheet already exists with smae name as ccSheetName"
-            elif symbolMap |> Map.exists (fun _ sym ->  caseInvariantEqual sym.Component.Label symLabel) then
+            elif
+                symbolMap
+                |> Map.exists (fun _ sym -> caseInvariantEqual sym.Component.Label symLabel)
+            then
                 Error "Can't create custom component with duplicate Label"
             else
                 let canvas = model.GetCanvasState()
                 let ccType: CustomComponentType =
-                    {
-                        Name = ccSheetName
-                        InputLabels = Extractor.getOrderedCompLabels (Input1 (0, None)) canvas
-                        OutputLabels = Extractor.getOrderedCompLabels (Output 0) canvas
-                        Form = None
-                        Description = None
-                    }
+                    { Name = ccSheetName
+                      InputLabels = Extractor.getOrderedCompLabels (Input1(0, None)) canvas
+                      OutputLabels = Extractor.getOrderedCompLabels (Output 0) canvas
+                      Form = None
+                      Description = None }
                 placeSymbol symLabel (Custom ccType) position model
-            
-        
 
         // Rotate a symbol
         let rotateSymbol (symLabel: string) (rotate: Rotation) (model: SheetT.Model) : (SheetT.Model) =
@@ -248,43 +327,55 @@ module HLPTick3 =
         /// The wire created will be smart routed but not separated from other wires: for a nice schematic
         /// separateAllWires should be run after  all wires are added.
         /// source, target: respectively the output port and input port to which the wire connects.
-        let placeWire (source: SymbolPort) (target: SymbolPort) (model: SheetT.Model) : Result<SheetT.Model,string> =
+        let placeWire (source: SymbolPort) (target: SymbolPort) (model: SheetT.Model) : Result<SheetT.Model, string> =
             let symbols = model.Wire.Symbol.Symbols
-            let getPortId (portType:PortType) symPort =
+            let getPortId (portType: PortType) symPort =
                 mapValues symbols
                 |> Array.tryFind (fun sym -> caseInvariantEqual sym.Component.Label symPort.Label)
-                |> function | Some x -> Ok x | None -> Error "Can't find symbol with label '{symPort.Label}'"
+                |> function
+                    | Some x -> Ok x
+                    | None -> Error "Can't find symbol with label '{symPort.Label}'"
                 |> Result.bind (fun sym ->
                     match portType with
                     | PortType.Input -> List.tryItem symPort.PortNumber sym.Component.InputPorts
                     | PortType.Output -> List.tryItem symPort.PortNumber sym.Component.OutputPorts
-                    |> function | Some port -> Ok port.Id
-                                | None -> Error $"Can't find {portType} port {symPort.PortNumber} on component {symPort.Label}")
-            
+                    |> function
+                        | Some port -> Ok port.Id
+                        | None -> Error $"Can't find {portType} port {symPort.PortNumber} on component {symPort.Label}")
+
             match getPortId PortType.Input target, getPortId PortType.Output source with
-            | Error e, _ | _, Error e -> Error e
+            | Error e, _
+            | _, Error e -> Error e
             | Ok inPort, Ok outPort ->
-                let newWire = BusWireUpdate.makeNewWire (InputPortId inPort) (OutputPortId outPort) model.Wire
-                if model.Wire.Wires |> Map.exists (fun wid wire -> wire.InputPort=newWire.InputPort && wire.OutputPort = newWire.OutputPort) then
-                        // wire already exists
-                        Error "Can't create wire from {source} to {target} because a wire already exists between those ports"
+                let newWire =
+                    BusWireUpdate.makeNewWire (InputPortId inPort) (OutputPortId outPort) model.Wire
+                if
+                    model.Wire.Wires
+                    |> Map.exists (fun wid wire ->
+                        wire.InputPort = newWire.InputPort
+                        && wire.OutputPort = newWire.OutputPort)
+                then
+                    // wire already exists
+                    Error
+                        "Can't create wire from {source} to {target} because a wire already exists between those ports"
                 else
-                     model
-                     |> Optic.set (busWireModel_ >-> BusWireT.wireOf_ newWire.WId) newWire
-                     |> Ok
-            
+                    model
+                    |> Optic.set (busWireModel_ >-> BusWireT.wireOf_ newWire.WId) newWire
+                    |> Ok
 
         /// Run the global wire separation algorithm (should be after all wires have been placed and routed)
         let separateAllWires (model: SheetT.Model) : SheetT.Model =
             model
-            |> Optic.map busWireModel_ (BusWireSeparate.updateWireSegmentJumpsAndSeparations (model.Wire.Wires.Keys |> Seq.toList))
+            |> Optic.map
+                busWireModel_
+                (BusWireSeparate.updateWireSegmentJumpsAndSeparations (model.Wire.Wires.Keys |> Seq.toList))
 
         /// Copy testModel into the main Issie Sheet making its contents visible
         let showSheetInIssieSchematic (testModel: SheetT.Model) (dispatch: Dispatch<Msg>) =
             let sheetDispatch sMsg = dispatch (Sheet sMsg)
-            dispatch <| UpdateModel (Optic.set sheet_ testModel) // set the Sheet component of the Issie model to make a new schematic.
+            dispatch
+            <| UpdateModel(Optic.set sheet_ testModel) // set the Sheet component of the Issie model to make a new schematic.
             sheetDispatch <| SheetT.KeyPress SheetT.CtrlW // Centre & scale the schematic to make all components viewable.
-
 
         /// 1. Create a set of circuits from Gen<'a> samples by applying sheetMaker to each sample.
         /// 2. Check each ciruit with sheetChecker.
@@ -296,54 +387,77 @@ module HLPTick3 =
         let runTestOnSheets
             (name: string)
             (sampleToStartFrom: int)
-            (samples : Gen<'a>)
+            (samples: Gen<'a>)
             (sheetMaker: 'a -> SheetT.Model)
             (sheetChecker: int -> SheetT.Model -> string option)
             (dispatch: Dispatch<Msg>)
-                : TestResult<'a> =
+            : TestResult<'a>
+            =
             let generateAndCheckSheet n = sheetMaker >> sheetChecker n
             let result =
-                {
-                    Name=name;
-                    Samples=samples;
-                    StartFrom = sampleToStartFrom
-                    Assertion = generateAndCheckSheet
-                }
+                { Name = name
+                  Samples = samples
+                  StartFrom = sampleToStartFrom
+                  Assertion = generateAndCheckSheet }
                 |> runTests
             match result.TestErrors with
             | [] -> // no errors
                 printf $"Test {result.TestName} has PASSED."
-            | (n,first):: _ -> // display in Issie editor and print out first error
+            | (n, first) :: _ -> // display in Issie editor and print out first error
                 printf $"Test {result.TestName} has FAILED on sample {n} with error message:\n{first}"
                 match catchException "" sheetMaker (samples.Data n) with
                 | Ok sheet -> showSheetInIssieSchematic sheet dispatch
                 | Error mess -> ()
             result
-//--------------------------------------------------------------------------------------------------//
-//----------------------------------------Example Test Circuits using Gen<'a> samples---------------//
-//--------------------------------------------------------------------------------------------------//
+    //--------------------------------------------------------------------------------------------------//
+    //----------------------------------------Example Test Circuits using Gen<'a> samples---------------//
+    //--------------------------------------------------------------------------------------------------//
 
     open Builder
+
     /// Sample data based on 11 equidistant points on a horizontal line
     let horizLinePositions =
-        fromList [-100..20..100]
-        |> map (fun n -> middleOfSheet + {X=float n; Y=0.})
+        fromList [ -100..20..100 ]
+        |> map (fun n -> middleOfSheet + { X = float n; Y = 0. })
+
+    let randomRotation () =
+        let rotations = [| Degree0; Degree90; Degree180; Degree270 |]
+        rotations.[random.Next(rotations.Length)]
+
+    let randomFlipType () =
+        let flips = [| SymbolT.FlipType.FlipHorizontal; SymbolT.FlipType.FlipVertical |]
+        flips.[random.Next(flips.Length)]
 
     /// demo test circuit consisting of a DFF & And gate
-    let makeTest1Circuit (andPos:XYPos) =
+    let makeTest1Circuit (andPos: XYPos) =
         initSheetModel
-        |> placeSymbol "G1" (GateN(And,2)) andPos
+        |> placeSymbol "G1" (GateN(And, 2)) andPos
         |> Result.bind (placeSymbol "FF1" DFF middleOfSheet)
         |> Result.bind (placeWire (portOf "G1" 0) (portOf "FF1" 0))
-        |> Result.bind (placeWire (portOf "FF1" 0) (portOf "G1" 0) )
+        |> Result.bind (placeWire (portOf "FF1" 0) (portOf "G1" 0))
         |> getOkOrFail
 
+    let makeCustomTestCircuit (secondComponentPos: XYPos) =
+        initSheetModel
+        |> placeSymbol "AND1" (GateN(And, 2)) middleOfSheet
+        |> Result.bind (placeSymbol "OR2" (GateN(Or, 2)) secondComponentPos)
+        |> Result.bind (placeWire (portOf "AND1" 0) (portOf "OR2" 0))
+        |> Result.bind (placeWire (portOf "OR2" 0) (portOf "AND1" 0))
+        |> getOkOrFail
 
+    let makeOrientedTestCircuit (secondComponentPos: XYPos) =
+        initSheetModel
+        |> placeAndOrientSymbol "AND1" (GateN(And, 2)) middleOfSheet (randomRotation ()) (randomFlipType ())
+        |> Result.bind (
+            placeAndOrientSymbol "OR2" (GateN(Or, 2)) secondComponentPos (randomRotation ()) (randomFlipType ())
+        )
+        |> Result.bind (placeWire (portOf "AND1" 0) (portOf "OR2" 0))
+        |> Result.bind (placeWire (portOf "OR2" 0) (portOf "AND1" 0))
+        |> getOkOrFail
 
-//------------------------------------------------------------------------------------------------//
-//-------------------------Example assertions used to test sheets---------------------------------//
-//------------------------------------------------------------------------------------------------//
-
+    //------------------------------------------------------------------------------------------------//
+    //-------------------------Example assertions used to test sheets---------------------------------//
+    //------------------------------------------------------------------------------------------------//
 
     module Asserts =
 
@@ -352,23 +466,25 @@ module HLPTick3 =
            easy to document tests and so that any specific sampel schematic can easily be displayed using failOnSampleNumber. *)
 
         /// Ignore sheet and fail on the specified sample, useful for displaying a given sample
-        let failOnSampleNumber (sampleToFail :int) (sample: int) _sheet =
+        let failOnSampleNumber (sampleToFail: int) (sample: int) _sheet =
             if sampleToFail = sample then
                 Some $"Failing forced on Sample {sampleToFail}."
             else
                 None
 
         /// Fails all tests: useful to show in sequence all the sheets generated in a test
-        let failOnAllTests (sample: int) _ =
-            Some <| $"Sample {sample}"
+        let failOnAllTests (sample: int) _ = Some <| $"Sample {sample}"
 
-        /// Fail when sheet contains a wire segment that overlaps (or goes too close to) a symbol outline  
+        /// Fail when sheet contains a wire segment that overlaps (or goes too close to) a symbol outline
         let failOnWireIntersectsSymbol (sample: int) (sheet: SheetT.Model) =
             let wireModel = sheet.Wire
             wireModel.Wires
-            |> Map.exists (fun _ wire -> BusWireRoute.findWireSymbolIntersections wireModel wire <> [])
-            |> (function | true -> Some $"Wire intersects a symbol outline in Sample {sample}"
-                         | false -> None)
+            |> Map.exists (fun _ wire ->
+                BusWireRoute.findWireSymbolIntersections wireModel wire
+                <> [])
+            |> (function
+            | true -> Some $"Wire intersects a symbol outline in Sample {sample}"
+            | false -> None)
 
         /// Fail when sheet contains two symbols which overlap
         let failOnSymbolIntersectsSymbol (sample: int) (sheet: SheetT.Model) =
@@ -376,32 +492,60 @@ module HLPTick3 =
             let boxes =
                 mapValues sheet.BoundingBoxes
                 |> Array.toList
-                |> List.mapi (fun n box -> n,box)
-            List.allPairs boxes boxes 
-            |> List.exists (fun ((n1,box1),(n2,box2)) -> (n1 <> n2) && BlockHelpers.overlap2DBox box1 box2)
-            |> (function | true -> Some $"Symbol outline intersects another symbol outline in Sample {sample}"
-                         | false -> None)
+                |> List.mapi (fun n box -> n, box)
+            List.allPairs boxes boxes
+            |> List.exists (fun ((n1, box1), (n2, box2)) -> (n1 <> n2) && BlockHelpers.overlap2DBox box1 box2)
+            |> (function
+            | true -> Some $"Symbol outline intersects another symbol outline in Sample {sample}"
+            | false -> None)
+    //--------------------------------------------------------------------------------------------------//
+    //----------------------------------------Generating 2D Data for Testing----------------------------//
+    //--------------------------------------------------------------------------------------------------//
 
+    module SampleData =
+        open Asserts
 
+        let gridSize = 100.0
+        let gridStep = 20.0
+        let generatePositionGen (center: XYPos) circuitMaker =
 
-//---------------------------------------------------------------------------------------//
-//-----------------------------Demo tests on Draw Block code-----------------------------//
-//---------------------------------------------------------------------------------------//
+            let positionsX =
+                fromList [ center.X - gridSize / 2.0 .. gridStep .. center.X + gridSize / 2.0 ]
+            let positionsY =
+                fromList [ center.Y - gridSize / 2.0 .. gridStep .. center.Y + gridSize / 2.0 ]
+            let allPositions = product (fun x y -> { X = x; Y = y }) positionsX positionsY
+
+            let allPositionsList = toList allPositions
+
+            let validPositions =
+                allPositionsList
+                |> List.filter (fun pos ->
+                    let model = circuitMaker pos
+                    match failOnSymbolIntersectsSymbol 0 model with
+                    | None -> true // No overlap, keep this position
+                    | Some _ -> false // Overlap found, discard this position
+                )
+            fromList validPositions
+
+    //---------------------------------------------------------------------------------------//
+    //-----------------------------Demo tests on Draw Block code-----------------------------//
+    //---------------------------------------------------------------------------------------//
 
     module Tests =
-
+        open SampleData
         /// Allow test errors to be viewed in sequence by recording the current error
         /// in the Issie Model (field DrawblockTestState). This contains all Issie persistent state.
         let recordPositionInTest (testNumber: int) (dispatch: Dispatch<Msg>) (result: TestResult<'a>) =
-            dispatch <| UpdateDrawBlockTestState(fun _ ->
+            dispatch
+            <| UpdateDrawBlockTestState(fun _ ->
                 match result.TestErrors with
                 | [] ->
                     printf "Test finished"
                     None
                 | (numb, _) :: _ ->
                     printf $"Sample {numb}"
-                    Some { LastTestNumber=testNumber; LastTestSampleIndex= numb})
-            
+                    Some { LastTestNumber = testNumber; LastTestSampleIndex = numb })
+
         /// Example test: Horizontally positioned AND + DFF: fail on sample 0
         let test1 testNum firstSample dispatch =
             runTestOnSheets
@@ -446,48 +590,66 @@ module HLPTick3 =
                 dispatch
             |> recordPositionInTest testNum dispatch
 
+        let test5 testNum firstSample dispatch =
+            let positionsGen = generatePositionGen middleOfSheet makeCustomTestCircuit
+
+            runTestOnSheets
+                "Auto-Wire Routing Test"
+                firstSample
+                positionsGen
+                makeCustomTestCircuit
+                Asserts.failOnWireIntersectsSymbol
+                dispatch
+            |> recordPositionInTest testNum dispatch
+
+        let test6 testNum firstSample dispatch =
+            let positionsGen = generatePositionGen middleOfSheet makeCustomTestCircuit
+
+            runTestOnSheets
+                "Orientation Test"
+                firstSample
+                positionsGen
+                makeOrientedTestCircuit
+                Asserts.failOnWireIntersectsSymbol
+                dispatch
+            |> recordPositionInTest testNum dispatch
+
         /// List of tests available which can be run ftom Issie File Menu.
         /// The first 9 tests can also be run via Ctrl-n accelerator keys as shown on menu
-        let testsToRunFromSheetMenu : (string * (int -> int -> Dispatch<Msg> -> Unit)) list =
+        let testsToRunFromSheetMenu: (string * (int -> int -> Dispatch<Msg> -> Unit)) list =
             // Change names and test functions as required
             // delete unused tests from list
-            [
-                "Test1", test1 // example
-                "Test2", test2 // example
-                "Test3", test3 // example
-                "Test4", test4 
-                "Test5", fun _ _ _ -> printf "Test5" // dummy test - delete line or replace by real test as needed
-                "Test6", fun _ _ _ -> printf "Test6"
-                "Test7", fun _ _ _ -> printf "Test7"
-                "Test8", fun _ _ _ -> printf "Test8"
-                "Next Test Error", fun _ _ _ -> printf "Next Error:" // Go to the nexterror in a test
+            [ "Test1", test1 // example
+              "Test2", test2 // example
+              "Test3", test3 // example
+              "Test4", test4
+              "Test5", test5
+              //   fun _ _ _ -> printf "Test5" // dummy test - delete line or replace by real test as needed
+              "Test6", test6
+              "Test7", (fun _ _ _ -> printf "Test7")
+              "Test8", (fun _ _ _ -> printf "Test8")
+              "Next Test Error",
+              fun _ _ _ -> printf "Next Error:" // Go to the nexterror in a test
 
-            ]
+              ]
 
         /// Display the next error in a previously started test
         let nextError (testName, testFunc) firstSampleToTest dispatch =
             let testNum =
                 testsToRunFromSheetMenu
-                |> List.tryFindIndex (fun (name,_) -> name = testName)
+                |> List.tryFindIndex (fun (name, _) -> name = testName)
                 |> Option.defaultValue 0
             testFunc testNum firstSampleToTest dispatch
 
         /// common function to execute any test.
         /// testIndex: index of test in testsToRunFromSheetMenu
         let testMenuFunc (testIndex: int) (dispatch: Dispatch<Msg>) (model: Model) =
-            let name,func = testsToRunFromSheetMenu[testIndex] 
+            let name, func = testsToRunFromSheetMenu[testIndex]
             printf "%s" name
             match name, model.DrawBlockTestState with
             | "Next Test Error", Some state ->
-                nextError testsToRunFromSheetMenu[state.LastTestNumber] (state.LastTestSampleIndex+1) dispatch
+                nextError testsToRunFromSheetMenu[state.LastTestNumber] (state.LastTestSampleIndex + 1) dispatch
             | "Next Test Error", None ->
                 printf "Test Finished"
                 ()
-            | _ ->
-                func testIndex 0 dispatch
-        
-
-
-    
-
-
+            | _ -> func testIndex 0 dispatch
